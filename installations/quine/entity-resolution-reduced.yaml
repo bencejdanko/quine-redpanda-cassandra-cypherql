@@ -1,0 +1,95 @@
+# This file defines a Quine Recipe
+
+# Optional: Add recipe metadata
+version: 1 # Good practice to version your recipes
+# title: Entity Resolution from Kafka to Cassandra
+# description: Ingests address data from Kafka, processes it, and stores structured results in Cassandra.
+
+# Define input streams (where Quine gets data)
+ingestStreams:
+  - type: KafkaIngest
+    name: address-input # A name for this input stream
+    topic: entity-data # Your Redpanda topic
+    brokers: redpanda-0:9092 # Your Redpanda broker
+    format:
+      type: json # <-- FIX: Changed 'JSON' back to 'Json'
+    # --- Kafka/Redpanda Security ---
+    kafkaProperties:
+      security.protocol: SASL_PLAINTEXT
+      sasl.mechanism: SCRAM-SHA-256
+      sasl.jaas.config: org.apache.kafka.common.security.scram.ScramLoginModule required username="superuser" password="secretpassword";
+    # Start reading from the latest messages (use 'Earliest' to re-process all)
+    startingOffset: Latest # Or Earliest
+
+# Define Standing Queries (Recipes - how to process data)
+standingQueries:
+  # This single SQ reads from Kafka, processes, and writes to Cassandra
+  - pattern: # <-- FIX: Changed pattern type and structure
+      type: Cypher
+      query: |-
+        MATCH ($that)
+        WHERE $that.meta.isIngest = true AND $that.meta.ingestStream = 'address-input'
+        RETURN $that
+    outputs: # Define what happens when the pattern matches
+      process-and-save-address: # Name for this output action
+        type: CypherQuery # Execute a Cypher query
+        # The query processes the incoming data ($that.value refers to the JSON payload
+        # from the node returned by the pattern query)
+        # and prepares columns for the Cassandra table
+        query: |
+          // Get the ingested JSON payload from the matched node
+          WITH $that.value AS inputData
+          // Generate a unique UUID for the Cassandra primary key
+          WITH uuid() AS generatedId, inputData
+          // Extract data, handling potential nulls in the 'parts' object if necessary
+          // (Using coalesce or similar might be safer if 'parts' or its fields can be missing)
+          RETURN
+            generatedId AS address_id, // Renamed for Cassandra column
+            inputData.original AS original_address,
+            inputData.addressee AS addressee,
+            inputData.parts.house AS house_part,
+            inputData.parts.poBox AS po_box,
+            inputData.parts.city AS city,
+            inputData.parts.state AS state,
+            inputData.parts.postcode AS postcode
+        # Specify where the results of the RETURN statement should go
+        output: cassandra-address-sink # Matches the name of the output sink below
+
+# Define Output Sinks (where processed data goes)
+outputs:
+  cassandra-address-sink: # Name used in the Standing Query output
+    type: CassandraSink
+    keyspace: entity_graph # Your keyspace
+    table: processed_addresses # Your table
+    # Connection details (can be specified here, or Quine can use quine.store settings if configured)
+    endpoints:
+      # --- IMPORTANT ---
+      # Adjust this based on how Quine can reach Cassandra from its runtime environment
+      # If Cassandra is running as a container named 'cassandra' on the same Docker network:
+      - cassandra:9042
+      # If Cassandra is exposed on your host machine's port 9042:
+      # - host.docker.internal:9042 # (For Docker Desktop)
+      # - <your-host-ip>:9042      # (For Linux Docker - replace with your host IP)
+    # Ensure the sink creates the table if it doesn't exist (useful for testing/dev)
+    # Set create-table to false if you manage the schema externally
+    create-table: false # <-- NOTE: Ensure the table exists in Cassandra before starting!
+    # Define the Cassandra INSERT/UPDATE statement (UPDATE acts as UPSERT)
+    # The order of columns in SET must match the order in parameterColumns
+    write-query: >
+      UPDATE entity_graph.processed_addresses
+      SET original_address = ?, addressee = ?, house_part = ?, po_box = ?, city = ?, state = ?, postcode = ?
+      WHERE address_id = ?;
+    # Map the RETURNed columns from Cypher to the '?' placeholders in write-query
+    # The order MUST match the placeholders '?' above
+    parameter-columns:
+      - original_address
+      - addressee
+      - house_part
+      - po_box
+      - city
+      - state
+      - postcode
+      - address_id # Corresponds to the WHERE clause placeholder
+    # Optional: Batching settings for performance
+    # max-batch-size: 100
+    # batch-timeout: "100 millis"
