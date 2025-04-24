@@ -6,25 +6,18 @@ CREATE KEYSPACE IF NOT EXISTS entity_graph WITH replication = {'class': 'SimpleS
 
 USE entity_graph;
 
-CREATE TABLE IF NOT EXISTS processed_addresses (
-    address_id uuid PRIMARY KEY,
-    original_address text,
-    addressee text,
-    house_part text,
-    po_box text,
-    city text,
-    state text,
-    postcode text
-    -- Optional: Add a timestamp for when it was processed/inserted
-    -- processed_at timestamp
+CREATE TABLE IF NOT EXISTS entity_payloads (
+    entity_id UUID PRIMARY KEY,
+    po_box TEXT,
+    postcode TEXT
 );
 
-DESCRIBE TABLE processed_addresses;
+DESCRIBE TABLE entity_payloads;
 EOF
 )
 
 # Execute the CQL commands using docker exec without -it for non-interactive execution
-docker exec cass_cluster cqlsh -e "$CQL_COMMANDS"
+docker exec cass_cluster cqlsh -e "$CQL_COMMANDS" -u cassandra -p cassandra
 
 # Optional: Check the exit status
 if [ $? -eq 0 ]; then
