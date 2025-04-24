@@ -5,14 +5,14 @@ set -e # Exit immediately if a command exits with a non-zero status.
 
 # Define configuration variables
 CONTAINER_NAME="cass_cluster"
-IMAGE_NAME="cassandra:latest"
+IMAGE_NAME="bitnami/cassandra:latest"
 NETWORK_NAME="data_platform_network"
 VOLUME_NAME="cassandra_data"
 CQL_PORT="9042"
 MAX_HEAP="512M"
 NEW_HEAP="100M"
-CPU_LIMIT="1.0"
-MEMORY_LIMIT="1G"
+CPU_LIMIT="2.0"
+MEMORY_LIMIT="3G"
 HEALTH_CMD="cqlsh -e 'describe keyspaces'"
 HEALTH_INTERVAL="15s"
 HEALTH_TIMEOUT="10s"

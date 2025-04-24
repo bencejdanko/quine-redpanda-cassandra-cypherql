@@ -6,8 +6,17 @@ description: Ingest address records from a public dataset and form each record i
 iconImage: 🤷
 
 ingestStreams:
-  - type: FileIngest
-    path: public-record-addresses-2021.ndjson
+  - type: KafkaIngest
+    topics:
+      - entity-data
+    bootstrapServers: localhost:19092,localhost:29092,localhost:39092
+    groupId: INGEST-1
+    # kafkaProperties:
+      # security.protocol: SASL_PLAINTEXT
+      # sasl.mechanism: SCRAM-SHA-256
+      # sasl.jaas.config: org.apache.kafka.common.security.scram.ScramLoginModule required username="superuser" password="secretpassword";
+      # auto.offset.reset: earliest
+      # session.timeout.ms: '45000'
     format:
       type: CypherJson
       query: >-
@@ -71,25 +80,33 @@ standingQueries:
           SET canonical.canonical = {poBox: $that.data.poBox, postcode: $that.data.postcode},
               canonical: Canonical
           CREATE (e)-[:resolved]->(canonical)
-
-  - pattern: # This re-emits the original record with a field showing its resolution.
-      type: Cypher
-      mode: MultipleValues
-      query: >-
-        MATCH (record)-[:record_for_entity]->(entity)-[:resolved]->(resolved)
-        WHERE resolved.canonical IS NOT NULL
-        RETURN id(record) AS record, id(resolved) AS resolved
-    outputs:
-      resolved-record:
-        type: CypherQuery
-        query: >-
-          MATCH (record)
-          WHERE id(record) = $that.data.record
-          WITH properties(record) as props 
-          RETURN props {.*, resolved: $that.data.resolved} AS resolved_entity
         andThen:
-          type: WriteToFile
-          path: "entities-resolved.ndjson"
+          type: WriteToKafka
+          topic: entity-graph
+          bootstrapServers: localhost:19092,localhost:29092,localhost:39092
+          format:
+            type: JSON
+
+
+  # - pattern: # This re-emits the original record with a field showing its resolution.
+  #     type: Cypher
+  #     mode: MultipleValues
+  #     query: >-
+  #       MATCH (record)-[:record_for_entity]->(entity)-[:resolved]->(resolved)
+  #       WHERE resolved.canonical IS NOT NULL
+  #       RETURN id(record) AS record, id(resolved) AS resolved
+  #   outputs:
+  #     resolved-record:
+  #       type: CypherQuery
+  #       query: >-
+  #         MATCH (record)
+  #         WHERE id(record) = $that.data.record
+  #         WITH properties(record) as props 
+  #         RETURN props {.*, resolved: $that.data.resolved} AS resolved_entity
+  #       andThen:
+  #         type: WriteToFile
+  #         path: "entities-resolved.ndjson"
+
 
 nodeAppearances:
   - predicate:

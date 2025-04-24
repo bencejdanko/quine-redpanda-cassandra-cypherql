@@ -14,7 +14,7 @@ from cassandra.query import SimpleStatement, PreparedStatement
 
 # Corrected Redpanda Brokers for host access
 REDPANDA_BROKERS = os.getenv('REDPANDA_BROKERS', 'localhost:19092,localhost:29092,localhost:39092')
-REDPANDA_TOPIC = os.getenv('REDPANDA_TOPIC', 'entity-data')
+REDPANDA_TOPIC = os.getenv('REDPANDA_TOPIC', 'entity-graph')
 REDPANDA_GROUP_ID = os.getenv('REDPANDA_GROUP_ID', 'address-processor-group')
 REDPANDA_USER = os.getenv('REDPANDA_USER', 'superuser') # Default user for many Redpanda examples
 REDPANDA_PASS = os.getenv('REDPANDA_PASS', 'secretpassword') # Default password for many Redpanda examples
