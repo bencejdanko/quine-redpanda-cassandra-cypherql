@@ -80,12 +80,14 @@ standingQueries:
           SET canonical.canonical = {poBox: $that.data.poBox, postcode: $that.data.postcode},
               canonical: Canonical
           CREATE (e)-[:resolved]->(canonical)
-        andThen:
-          type: WriteToKafka
-          topic: entity-graph
-          bootstrapServers: localhost:19092,localhost:29092,localhost:39092
-          format:
-            type: JSON
+      "toKafka":
+        type: WriteToKafka
+        topic: entity-graph
+        bootstrapServers: localhost:19092,localhost:29092,localhost:39092
+        format:
+          type: JSON
+
+          
 
 
   # - pattern: # This re-emits the original record with a field showing its resolution.
